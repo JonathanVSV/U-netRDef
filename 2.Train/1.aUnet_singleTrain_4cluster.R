@@ -1,16 +1,12 @@
-# Ahorita esta con la version bis, namas pa checar si da igual o casi igua, si no ya pa no volver a correr todos los modelos
 
-# library(unet)
-# libraries we're going to need later
 library(keras)
 library(tensorflow)
-# library(tfdatasets)
-# library(rsample)
-# library(tidyverse)
 library(reticulate)
 library(tfruns)
 
+# Load Unet3d configuration
 source("Unet3d_bis.R")
+# Load multilabel dice coefficient
 source("multilabel_dice_coefficient.R")
 # source("multilabel_dice_loss.R")
 
@@ -20,15 +16,15 @@ np <- import("numpy")
 # imagery
 input_type <- "MSSAR"
 
-#Training data
-# batch_size <- 64
+# Number of bands
 channels <- ifelse(input_type == "MSSAR", 6, 
                    ifelse(input_type == "MS", 4, 2))
+# Number of observations in the time dimension
 time_obs <- 4
+# Activation function for output
 activation_func_out <- "softmax"
 
-# Hyperparameter flags 
-
+# Hyperparameter flags; set as 0, so all values come from the tfruns
 FLAGS <- flags(
   flag_numeric("batch_size", 0),
   flag_numeric("learn_rate", 0),
@@ -39,13 +35,13 @@ FLAGS <- flags(
 )
 
 #Label data
-n_classes <- 3 # Estoy metiendo 0:2, que es 1 a 3
+n_classes <- 3
 
-#Dimensiones de las imagenes en cols y rows, sacarlas de QGIS
+# height and width of tiles
 img_width <- 128
 img_height <- 128
 
-#Este es el tamaño que sale despuas de hacer las convoluciones sin utlilizar padding; checar summary(model) pa ver las dimensiones finales
+# height and width of output tiles
 img_width_pred <- 128
 img_height_pred <- 128
 
@@ -53,68 +49,28 @@ img_height_pred <- 128
 
 # Numpy zip file option
 # Load npz
-npz2 <- np$load(paste0("Lacandona_Defor_FebApr_20192020_",input_type,"_Ene2022_4T",".npz"))
-# See files
-#npz2$files
+npz2 <- np$load(paste0("Lacandona_Defor_FebApr_20192020_",input_type,"_Ene2022_4T_revnov",".npz"))
 
 train_x_data <- npz2$f[["x_train"]]
 train_y_data <- npz2$f[["y_train"]]
 
-# Aqui hay que hacer algo con los datos para que estan en un rango entre 0 y 1, quizas como un hist stretch
+# Data over which the algorithm will use as verification
+# It's the same to use test as verif or viceversa. The only
+# thing is that one is used in the training and the other just for testing
 test_x_data <- npz2$f[["x_test"]]
 test_y_data <- npz2$f[["y_test"]]
 
-#----------------------------Sample weights----------------------------------------
-# Remember doing this will drop two extra dimensions (temporal and spectral)
-# samplew <- 1+(train_y_data[,,,,1, drop = F]*-1)
-# To ignore "no change" class leave it as 0
-
-# No change will be 0.0086, while change = 1
-# Weight determined from y_test data
-# samplew[samplew==0] <- 0.0086
-# samplew[samplew==1] <- 5
-
-#samplew2 <- array(0, dim = c(dim(samplew)[1],
-#                             dim(samplew)[2]+dim(samplew)[2],
-#                             dim(samplew)[3],
-#                             dim(samplew)[4],
-#                             dim(samplew)[5]))
-#samplew2[,1,,,] <- samplew
-#samplew2[,2,,,] <- samplew
-
-#rm(samplew)
-
 ###---------------------------Model Definition---------------------------------------
-# Recordar que el dropout es para evitar overfit, quizas ahorita no usarlo
+# Set model
 model <- unet3d_bis(input_shape = c(time_obs,img_width, img_height, channels),
                 num_classes = n_classes,
                 dropout = FLAGS$dropout,
-                #Aqui con 64 filtros como que ya no cabe en la memoria y corre super lento
+                # Take values from the FLAGS
                 filters = FLAGS$filters_firstlayer,
-                # Con menos layers como que no agarra nada
-                # 4 layers hace la max convolucion quede una imagen 4 x 4 pix; Hacer mas layers quizas no tiene mucho sentido. Asi es el modelo original de U-net con aplicaciones remote sensing
                 num_layers = FLAGS$num_layers,
                 output_activation = activation_func_out)
 
 summary(model)
-
-# Aqui esta el error, por alguna razon no corre el f1score bien. Checarlo a fondo
-
-# f1score <- custom_metric("f1score", function(y_true, y_pred, smooth = 1) {
-#   y_true_f <- k_flatten(y_true)
-#   y_pred_f <- k_flatten(y_pred)
-#   intersection <- k_sum(y_true_f * y_pred_f)
-#   (2 * intersection + smooth) / (k_sum(y_true_f) + k_sum(y_pred_f) + smooth)
-# })
-
-# dice_coef <- function(y_true, y_pred, smooth = 1.0) {
-#   y_true_f <- k_flatten(y_true)
-#   y_pred_f <- k_flatten(y_pred)
-#   intersection <- k_sum(y_true_f * y_pred_f)
-#   result <- (2 * intersection + smooth) /
-#     (k_sum(y_true_f) + k_sum(y_pred_f) + smooth)
-#   return(result)
-# }
 
 # sum of binary_crossentropy and soft-Dice
 # Based on imageseg package and Isaienkov et al., 2020
@@ -123,17 +79,6 @@ cce_dice_loss <- custom_metric("cce_dice_loss", function(y_true, y_pred) {
     (0.8 * (1 - multilabel_dice_coefficient(y_true, y_pred)))
   return(result)
 })
-
-# f1score <- custom_metric("f1score", function(y_true, y_pred, smooth = 1) {
-#   y_pred <- k_round(y_pred)
-#   
-#   precision <- k_sum(y_pred*y_true)/(k_sum(y_pred)+k_epsilon())
-#   recall    <- k_sum(y_pred*y_true)/(k_sum(y_true)+k_epsilon())
-#   
-#   f1 <- (2*precision*recall)/(precision+recall+k_epsilon())
-#   f1 <- tf$where
-#   k_mean(f1)
-# })
 
 model %>% compile(
   optimizer = optimizer_adam(learning_rate = FLAGS$learn_rate),
@@ -186,29 +131,6 @@ save_model_hdf5(model, paste0("U128model_f1loss",input_type,
                               "dropout", FLAGS$dropout,
                               "_lr",FLAGS$learn_rate,
                               "_adam",
-                              "_2022-02-11",".h5"))
-
-# plot(history)
-
-# score <- model %>% evaluate(
-#  test_x_data, test_y_data,
-#  verbose = 0
-#)
-
-#write.csv(score,paste0("U128model",input_type,
-#                              "filters", FLAGS$filters_firstlayer,
-#                              "Epochs",FLAGS$epochs,
-#                              "layers", FLAGS$num_layers,
-#                              "dropout", FLAGS$dropout,
-#                              "_lr",FLAGS$learn_rate,
-#                              "_adam",
-#                              "_2021-12-01",".csv"))
-
-#cat('Test loss:', score$loss, '\n')
-#cat('Test accuracy:', score$acc, '\n')
-#cat('Test f1score:', score$f1score, '\n')
-#cat('Train loss:', score$loss, '\n')
-#cat('Train accuracy:', score$acc, '\n')
-#cat('Train f1score:', score$f1score, '\n')
+                              "_2022-11-26",".h5"))
 
 rm(list=ls())

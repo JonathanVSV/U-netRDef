@@ -3,16 +3,17 @@ library(raster)
 library(rray)
 library(dplyr)
 library(fasterize)
-# library(imager)
 library(reticulate)
 
-# Check mask creation, 'cause class number is hard set
-input_type <- "MS"
-n_classes <- 2 # Without background = no change
+# Variable definition
+input_type <- "MSSAR"
+n_classes <- 3 # no deforestation and two deforestation classes
 
+# bands
 channels <- ifelse(input_type == "MSSAR", 6, 
                    ifelse(input_type == "MS", 4, 2))
 
+# Depth in time dimension
 timeObs <- 4 #(2019 and 2020)
 
 # Size of windows in pixels (training data)
@@ -23,20 +24,18 @@ img_width_exp <- 128
 img_height_exp <- 128
 
 # Number of 128pix-squares that are going to be obtained per 256 pix-squares
-# In this case we are going to use 25 (5 x 5 128 x 128 pix) using a 32 pix offset
-# This is cropping the image as 1-129, 1-129; 33-161, 1-129; 65-193, 1-129; 97-225, 1-129; 129-256, 1-129 
 num_squares <- 3^2
+# Probability values to make crops of image
 probs_4crops <- 1 / (sqrt(num_squares)-1) 
-# Number of mirrored images per 128pix-image
-# num_mirrors <- 2
+# If mirrored images is used this can be a larger number
 multip_im <- 1
 
 #----------------------------------Load and pre process stuff-------------------------------
 # Load images stack MS + SAR
-im2019_1 <- stack("im2019MSSAR_stack_NAfill.tif")
-im2019_2 <- stack("im2019MSSAR_rain1_stack_NAfill.tif")
-im2019_3 <- stack("im2019MSSAR_rain2_stack_NAfill.tif")
-im2020 <- stack("im2020MSSAR_stack_NAfill.tif")
+im2019_1 <- stack("S1y2_9immedian_2A_6B_2019-02-01_2019-04-30_median_10mBandsMaxCCL100.tif")
+im2019_2 <- stack("S1y2_9immedian_2A_6B_2019-05-01_2019-09-30_median_10mBandsMaxCCL100.tif")
+im2019_3 <- stack("S1y2_9immedian_2A_6B_2019-10-01_2020-01-31_median_10mBandsMaxCCL100.tif")
+im2020 <- stack("S1y2_9immedian_2A_6B_2020-02-01_2020-04-30_median_10mBandsMaxCCL100.tif")
 
 # Depending on the input image type subset certain bands
 if(input_type != "MSSAR"){
@@ -53,37 +52,21 @@ if(input_type != "MSSAR"){
   }
 }
 
-# Traning data
-# defor_patch <- st_read("D:/Drive/Jonathan_trabaggio/Doctorado/GeoInfo/Defor_points/Defor4Unet/defor_patch_valid.shp")
-defor_patch <- st_read("defor_patch_valid_2022.shp")
+# Manual delineated polygons
+defor_patch <- st_read("defor_patch_valid_2022_revnov.shp")
+# Rasterize the data using im2019_1 as template
+defor_im <- fasterize(defor_patch,
+                      im2019_1[[1]],
+                      background = 0,
+                      field = "id2022")
 
-# Make 128 x 128 areas for training
-# Get centroids and project info to utm 15 n
-# centroids <- defor_patch %>%
-#   st_centroid() %>%
-#   # Change to utm 15 N
-#   st_transform(32615)
-# 
-# areas128 <- centroids %>%
-#   # Get squares 256 x 256 px squares (10 m res)
-#   st_buffer(dist = 1280,
-#             endCapStyle = "SQUARE") %>%
-#   # Select only field that will be y in models
-#   dplyr::select(finid) %>%
-#   # Eliminate defor in other years
-#   filter(finid < 3) %>%
-#   st_transform(4326) %>%
-# # PRUEBA
-#   slice(1:10)
-
-# areas128 <- st_read("D:/Drive/Jonathan_trabaggio/Doctorado/GeoInfo/Defor_points/Defor4Unet/areas128.shp")
+# Squared grids used to determine train test verif datasets
 areas128 <- st_read("Grids_defor.shp")
 
-# defor_im <- raster("Raster/deforImage_crop.tif")
-defor_im <- raster("deforImage_crop.tif")
-
-# plot(defor_im)
-# Crop 128 px areas for input images
+# Cut all images according to the grids for train test verif
+# Make sure that all areas consist of 128 x 128 areas (final crop)
+# If you have more images in the temporal dimension, the images can be placed
+# inside a list and perform this task as an lapply nested inside other lapply
 im2019_1_tiles <- lapply(1:nrow(areas128), function(i){
   poly <- areas128 %>% slice(i)
   # Subset by poly
@@ -91,8 +74,6 @@ im2019_1_tiles <- lapply(1:nrow(areas128), function(i){
   # Force to crop image to 256 tiles
   temp <- crop(temp,extent(temp, 2, (2+img_width-1), 2, (2+img_height-1)))
 })
-
-print(paste0("length im2019_1: ",length(im2019_1_tiles)))
 
 # Crop 128 px areas for input images
 im2019_2_tiles <- lapply(1:nrow(areas128), function(i){
@@ -103,8 +84,6 @@ im2019_2_tiles <- lapply(1:nrow(areas128), function(i){
   temp <- crop(temp,extent(temp, 2, (2+img_width-1), 2, (2+img_height-1)))
 })
 
-print(paste0("length im2019_2: ",length(im2019_2_tiles)))
-
 # Crop 128 px areas for input images
 im2019_3_tiles <- lapply(1:nrow(areas128), function(i){
   poly <- areas128 %>% slice(i)
@@ -114,8 +93,6 @@ im2019_3_tiles <- lapply(1:nrow(areas128), function(i){
   temp <- crop(temp,extent(temp, 2, (2+img_width-1), 2, (2+img_height-1)))
 })
 
-print(paste0("length im2019_3: ",length(im2019_3_tiles)))
-
 im2020_tiles <- lapply(1:nrow(areas128), function(i){
   poly <- areas128 %>% slice(i)
   # Subset by poly
@@ -124,18 +101,13 @@ im2020_tiles <- lapply(1:nrow(areas128), function(i){
   temp <- crop(temp,extent(temp, 2, (2+img_width-1), 2, (2+img_height-1)))
 })
 
-print(paste0("length im 2020: ", length(im2020_tiles)))
-
-
-# Crop 128 px areas for training
+# Crop the raster of manually delineated deforestations
 defor_tiles <- lapply(1:nrow(areas128), function(i){
   poly <- areas128 %>% slice(i)
   # Subset by poly
   temp <- crop(defor_im,poly)
   temp <- crop(temp,extent(temp, 2, (2+img_width-1), 2, (2+img_height-1)))
 })
-
-print(paste0("length defor_tiles: ", length(defor_tiles)))
 
 # Create an empty list to save cropped class info
 defor_tiles_list <- vector(mode = "list", 
@@ -144,22 +116,11 @@ defor_tiles_list <- vector(mode = "list",
 # Change masks to binary representations
 # List with two dimensions, first index is number of image
 # Second index is type of cover mask
-
-
-# Change masks to binary representations
-# List with two dimensions, first index is number of image
-# Second index is type of cover mask
 for (j in 1:length(defor_tiles_list)){
-  defor_tiles_list[[j]] <- stack(lapply(0:n_classes, function(i){
+  defor_tiles_list[[j]] <- stack(lapply(0:(n_classes-1), function(i){
     defor_tiles[[j]] == i
   }))
 }
-
-print(paste0("length defor tiles list: ", length(defor_tiles_list)))
-# Plot
-# plot(im2019_tiles[[7]])
-# plot(im2020_tiles[[7]])
-# plot(defor_tiles_list[[17]])
 
 # ---------------Convert info to arrays----------------------------------------------------
 # Change image (features data) to type array
@@ -171,8 +132,7 @@ cropped_im_matrt4 <- lapply(im2020_tiles, as.array)
 # Change class info (labels data) to type array
 cropped_mask_matr <- lapply(defor_tiles_list, as.array)
 
-print(paste0("cropped mask_matr: ", length(cropped_mask_matr)))
-
+# Remove unused objects
 rm(im2019_1_tiles,im2019_2_tiles,im2019_3_tiles,im2020_tiles,defor_tiles_list,defor_tiles)
 
 # Create empty arrays to fill it with the previous info
@@ -188,7 +148,7 @@ train_y_data<-array(0,
                             1,
                             img_height,
                             img_width,
-                            (n_classes+1)))
+                            (n_classes)))
 
 # Fill the arrays
 for(i in 1:length(cropped_im_matrt1)) {
@@ -199,7 +159,7 @@ for(i in 1:length(cropped_im_matrt1)) {
 }
 
 for(i in 1:length(cropped_mask_matr)) {
-  train_y_data[i,1,1:img_width,1:img_height,1:(n_classes+1)] <- cropped_mask_matr[[i]]
+  train_y_data[i,1,1:img_width,1:img_height,1:(n_classes)] <- cropped_mask_matr[[i]]
   # print(paste0("first array fill i run: ",i))
 }
 
@@ -218,7 +178,7 @@ train_y_data_128<-array(0,
                                 1,
                                 img_height_exp,
                                 img_width_exp,
-                                (n_classes+1)))
+                                (n_classes)))
 
 # Vectors with starting positions to make 128 x 128 pix squares
 temp <- unique(quantile(seq(1,img_width_exp+1), probs = seq(0, 1, probs_4crops)))
@@ -252,7 +212,7 @@ for(i in 1:dim(train_y_data)[1]) {
                                                 ,
                                                 crops[j]:(crops[j]+sum_pix),
                                                 crops[k]:(crops[k]+sum_pix),
-                                                1:(n_classes+1)]
+                                                1:(n_classes)]
       aux <- aux + 1
     }
   }
@@ -260,6 +220,7 @@ for(i in 1:dim(train_y_data)[1]) {
 
 rm(train_x_data,train_y_data)
 
+# Optional part if augumentation includes mirrored images
 # # ---------------Mirrored Images----------------------------------------------------
 # # Get number of total images (original + 2 mirrors)
 # multip_im <- num_mirrors + 1
@@ -276,7 +237,7 @@ rm(train_x_data,train_y_data)
 #                                   1,
 #                                   img_height_exp,
 #                                   img_width_exp,
-#                                   (n_classes+1)))
+#                                   (n_classes)))
 # 
 # 
 # aux <- 1
@@ -306,21 +267,21 @@ rm(train_x_data,train_y_data)
 
 
 # --------------------------Avoid mirror images-------------------------------------
-
+# Just pass the data from _data_128 to _data_final
 train_x_data_final <- train_x_data_128
 train_y_data_final <- train_y_data_128
 
 rm(train_x_data_128,train_y_data_128)
 
-# ---------------Normalize Images----------------------------------------------------
+# ---------------Standardize Images----------------------------------------------------
 # Before exporting all the data, let's calculate per band mean and SD to normalize the data
 # Leave it without na.rm to check that no NA are left in the training data
 # if there are NA U-net will break
 mean_x <- apply(train_x_data_final, 5, function(x) mean(x))
 sd_x <- apply(train_x_data_final, 5, function(x) sd(x))
 
-write.csv(mean_x, paste0("Mean_x",input_type,"_4T.csv"), row.names = F)
-write.csv(sd_x, paste0("sd_x",input_type,"_4T.csv"), row.names = F)
+write.csv(mean_x, paste0("Mean_x",input_type,"_4T_revnov.csv"), row.names = F)
+write.csv(sd_x, paste0("sd_x",input_type,"_4T_revnov.csv"), row.names = F)
 
 # Normalize data (only features data)
 for(i in 1:dim(train_x_data_final)[1]){
@@ -346,7 +307,8 @@ testers <- seq(1, dim(train_x_data_final)[1], imgs_share)
 
 # Make sample reproducible
 set.seed(8)
-testers_rows<- sample(testers, floor(length(testers)*0.3))
+# Set training data as 60 % of data ( 1 - 0.6 = 0.4)
+testers_rows<- sample(testers, floor(length(testers)*0.4))
 testers_rows<-unlist(lapply(testers_rows, function(x) seq(x, x+(imgs_share-1),1)))
 
 # Define test and training data
@@ -354,6 +316,23 @@ test_x_data_final <- train_x_data_final[testers_rows,,,,]
 # Force drop = F, avoid eliminating single temporal dimension
 test_y_data_final <- train_y_data_final[testers_rows,1,,,,drop = F]
 
+# Verif dataset
+# Make sample reproducible
+verifers <- seq(1, dim(test_x_data_final)[1], imgs_share)
+set.seed(10)
+# Set verification data as half (0.5) of the test data, i.e., 20 % of total
+verifers_rows<- sample(verifers, floor(length(verifers)*0.5))
+verifers_rows<-unlist(lapply(verifers_rows, function(x) seq(x, x+(imgs_share-1),1)))
+
+verif_x_data_final <- test_x_data_final[verifers_rows,,,,]
+verif_y_data_final <- test_y_data_final[verifers_rows,1,,,,drop = F]
+
+# Remove verifers from test dataset
+test_x_data_final <- test_x_data_final[-verifers_rows,,,,] 
+test_y_data_final <- test_y_data_final[-verifers_rows,1,,,,drop = F]
+
+# Train dataset
+# Set training data as the data not contained in test and verif data
 train_x_data_final <- train_x_data_final[-testers_rows,,,,]
 train_y_data_final <- train_y_data_final[-testers_rows,,,,,drop = F]
 
@@ -362,8 +341,12 @@ train_y_data_final <- train_y_data_final[-testers_rows,,,,,drop = F]
 # This option was prefered as a single file can contain both training and test data
 np <- import("numpy")
 
-np$savez(paste0("Lacandona_Defor_FebApr_20192020_",input_type,"_Ene2022_4T",".npz"), 
+# Save train test verif datasets
+np$savez(paste0("Lacandona_Defor_FebApr_20192020_",input_type,"_Ene2022_4T_revnov",".npz"), 
          x_train = train_x_data_final, 
          y_train = train_y_data_final, 
          x_test = test_x_data_final, 
-         y_test = test_y_data_final)
+         y_test = test_y_data_final,
+         x_verif = verif_x_data_final,
+         y_verif = verif_y_data_final)
+

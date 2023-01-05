@@ -1,35 +1,29 @@
-# library(unet)
 library(keras)
 library(dplyr)
 library(reticulate)
 library(raster)
-# library(rray)
 library(sf)
 
 source("multilabel_dice_coefficient.R")
 
 ##---------------------Constant def---------------------------------------
-# Best MSSAR
 # Select model that had the best performance
-# model_location <- paste0("DeforhypTune_16batches_MSSAR_4T2022-01-27/2022-01-28T01-09-39Z/U128model_f1lossMSSARfilters64Epochs9layers5dropout0.1_lr1e-04_adam_2022-01-27.h5")
-
-# Select model that had the best performance
-model_location <- paste0("DeforhypTune_16batches_MSSAR_4T2022-02-04/2022-02-07T06-35-51Z/U128model_f1lossMSSARfilters64Epochs9layers5dropout0.1_lr1e-04_adam_2022-02-04.h5")
+model_location <- paste0("DeforhypTune_16batches_MSSAR_4T_revnov2022-11-24/2022-11-25T08-47-01Z/U128model_f1lossMSSARfilters64Epochs9layers4dropout0.1_lr1e-04_adam_2022-11-21.h5")
 # Image
 imagery <- "MSSAR"
 # Label data
-n_classes <- 3 # Estoy quitando la cero y empezando de 1 hasta 11; incluye la de ciudad
+n_classes <- 3 
 time_obs <- 4
 channels <- ifelse(imagery == "MSSAR", 6, 
                    ifelse(imagery == "MS", 4, 2))
 
-# Training data
+# Training hyperparameters
 batch_size <- 16
 learn_rate <- 1e-4
 epochs <- 9
 dropout <- 0.1
 filters_firstlayer <- 64
-num_layers <- 5
+num_layers <- 4
 
 activation_func_out <- "softmax" 
 
@@ -46,7 +40,7 @@ img_height_pred <- 128
 np <- import("numpy")
 
 # Load npz
-npz2 <- np$load("Lacandona_Defor_fullImg_a_MSSAR_4T.npz")
+npz2 <- np$load(paste0("Lacandona_Defor_fullImg_a_",imagery,"_4T_revnov.npz"))
 
 test_x_data <- npz2$f[["x_test"]]
 
@@ -70,15 +64,12 @@ model <- load_model_hdf5(model_location,
                                             "multilabel_dice_coefficient" = multilabel_dice_coefficient,
                                             "cce_dice_loss" = cce_dice_loss))
 
-#rast_list <- vector(length = dim(test_x_data)[1], mode = "list")
-# PRedicted images
+# PRedicted images list
 rast_pred_list <- vector(length = dim(test_x_data)[1], mode = "list")
-# Probabilities raster
+# Probabilities raster list
 rast_prob_list <- vector(length = dim(test_x_data)[1], mode = "list")
 
-# Aguas con esta parte porque si sale un error en los plots, se quedan vacías algunas listas y entonces se promedia con 0 la precisión.
-
-# Accuracy
+# Get predicted class and probability
 for(j in 1:dim(test_x_data)[1]){
   image_real<-array_reshape(test_x_data[j,,,,1:channels],c(1,time_obs,img_width_pred,img_height_pred,channels))
   
@@ -123,19 +114,14 @@ for(j in 1:dim(test_x_data)[1]){
 
 # ------------------Fill layer into original positions-----------------------------------
 # Locations of image files
-optic_names <- "im2019MSSAR_stack_NAfill.tif"
-
-# area <- st_read("roi.shp")
+optic_names <- "S1y2_9immedian_2A_6B_2019-02-01_2019-04-30_median_10mBandsMaxCCL100.tif"
 
 # Read images as stacks
 optic <- stack(optic_names)
 
-# Crop to area
-# optic <- crop(optic, area)
-
 dim(optic)
 
-# Create splits vector
+# Create splits vector, to rebuild original image
 splits <- c(floor(dim(optic)[1] / 128),floor(dim(optic)[2] / 128))
 
 x_splits <- seq(1, (floor(dim(optic)[1] / 128) * 128), 128)
@@ -159,7 +145,6 @@ for(i in 1:(length(x_splits)-1)){
   }    
 }
 
-
 pred_im <- raster(as.matrix(pred_im))
 prob_im <- raster(as.matrix(prob_im))
 
@@ -177,36 +162,29 @@ crs(prob_im) <- crs(optic)
 res(pred_im) 
 res(optic)
 
-# Mask to get only the region of interest
-# pred_im <- mask(pred_im, area)
-# prob_im <- mask(prob_im, area)
-
+# Write rasters
 writeRaster(pred_im,
-            paste0("FullImageClassification_a_",imagery,".tif"),
+            paste0("FullImageClassification_a_",imagery,"_revnov.tif"),
             format = "GTiff",
             overwrite = T)
 
 writeRaster(prob_im,
-            paste0("FullImageProbabilities_a_",imagery,".tif"),
+            paste0("FullImageProbabilities_a_",imagery,"_revnov.tif"),
             format = "GTiff",
             overwrite = T)
 
 ## ----------------Second grid--------------------------------------------------------------------
 # --------------------------Read first set of tiles-------------------------------------------------
-
+# Do the same but with grid B
 # Load npz
-npz2 <- np$load("Lacandona_Defor_fullImg_b_MSSAR_4T.npz")
+npz2 <- np$load(paste0("Lacandona_Defor_fullImg_b_",imagery,"_4T_revnov.npz"))
 
 test_x_data <- npz2$f[["x_test"]]
 
-###---------------------------Model Definition---------------------------------------
-#rast_list <- vector(length = dim(test_x_data)[1], mode = "list")
 # PRedicted images
 rast_pred_list <- vector(length = dim(test_x_data)[1], mode = "list")
 # Probabilities raster
 rast_prob_list <- vector(length = dim(test_x_data)[1], mode = "list")
-
-# Aguas con esta parte porque si sale un error en los plots, se quedan vacías algunas listas y entonces se promedia con 0 la precisión.
 
 # Accuracy
 for(j in 1:dim(test_x_data)[1]){
@@ -255,15 +233,11 @@ rm(test_x_data)
 
 # ------------------Fill layer into original positions-----------------------------------
 # Locations of image files
-optic_names <- "im2019MSSAR_stack_NAfill.tif"
+optic_names <- "S1y2_9immedian_2A_6B_2019-02-01_2019-04-30_median_10mBandsMaxCCL100.tif"
 
-# area <- st_read("roi.shp")
 
 # Read images as stacks
 optic <- stack(optic_names)
-
-# Crop to roi
-# optic <- crop(optic, area)
 
 dim(optic)
 
@@ -322,16 +296,12 @@ crs(prob_im) <- crs(optic)
 res(pred_im) 
 res(optic)
 
-# Mask to get only the region of interest
-# pred_im <- mask(pred_im, area)
-# prob_im <- mask(prob_im, area)
-
 writeRaster(pred_im,
-            paste0("FullImageClassification_b_",imagery,".tif"),
+            paste0("FullImageClassification_b_",imagery,"_revnov.tif"),
             format = "GTiff",
             overwrite = T)
 
 writeRaster(prob_im,
-            paste0("FullImageProbabilities_b_",imagery,".tif"),
+            paste0("FullImageProbabilities_b_",imagery,"_revnov.tif"),
             format = "GTiff",
             overwrite = T)

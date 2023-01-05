@@ -123,6 +123,8 @@ unet3d_bis <- function(input_shape, num_classes = 1, dropout = 0.5, filters = 64
     aux <- aux+1
   }
   
+  # Convolution over the time dimension to obtain a map of
+  # a single value in the temporal dimension (i.e., change map)
   output <- keras::layer_conv_3d(
     x,
     filters = num_classes,

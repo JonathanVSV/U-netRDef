@@ -3,10 +3,10 @@ library(raster)
 library(rray)
 library(dplyr)
 library(fasterize)
-# library(imager)
 library(reticulate)
 
-# Check mask creation, 'cause class number is hard set
+# Variables definition
+# Very similar to the variables in 1.DirectArray_TrainTestData_4cluster_4T
 input_type <- "MSSAR"
 n_classes <- 3
 
@@ -21,13 +21,12 @@ img_height <- 256
 img_width_exp <- 128
 img_height_exp <- 128
 
+# Helper variable
 nless1 <- img_width_exp-1 
 
 # Number of 128pix-squares that are going to be obtained per 256 pix-squares
-# In this case we are going to use 25 (5 x 5 128 x 128 pix) using a 32 pix offset
-# This is cropping the image as 1-129, 1-129; 33-161, 1-129; 65-193, 1-129; 97-225, 1-129; 129-256, 1-129 
 num_squares <- 3^2
-probs_4crops <- 1 / (sqrt(num_squares)-1) 
+# probs_4crops <- 1 / (sqrt(num_squares)-1) 
 # Number of mirrored images per 128pix-image
 # num_mirrors <- 2
 multip_im <- 1
@@ -35,10 +34,10 @@ multip_im <- 1
 #----------------------First graticule-------------------------------------------------
 
 # Load images stack MS + SAR
-im2019_1 <- stack("im2019MSSAR_stack_NAfill.tif")
-im2019_2 <- stack("im2019MSSAR_rain1_stack_NAfill.tif")
-im2019_3 <- stack("im2019MSSAR_rain2_stack_NAfill.tif")
-im2020 <- stack("im2020MSSAR_stack_NAfill.tif")
+im2019_1 <- stack("S1y2_9immedian_2A_6B_2019-02-01_2019-04-30_median_10mBandsMaxCCL100.tif")
+im2019_2 <- stack("S1y2_9immedian_2A_6B_2019-05-01_2019-09-30_median_10mBandsMaxCCL100.tif")
+im2019_3 <- stack("S1y2_9immedian_2A_6B_2019-10-01_2020-01-31_median_10mBandsMaxCCL100.tif")
+im2020 <- stack("S1y2_9immedian_2A_6B_2020-02-01_2020-04-30_median_10mBandsMaxCCL100.tif")
 
 dim1 <- dim(im2019_1)[1]
 dim2 <- dim(im2019_1)[2]
@@ -84,17 +83,10 @@ for(i in 1:(length(x_splits)-1)){
   }    
 }
 
-print("pred_x_data")
-print(pred_x_data[1:10,1,1:10,1:10,1])
-
-# plot(as.raster(pred_x_data[2700,1:128,1:128,1:3]/2000))
-
 # once we've got the arrays we need to normalize the data according to mean and sd values
-bands_mean <- read.csv(paste0("Mean_x",input_type,"_4T.csv"))[,1]
-bands_sd <- read.csv(paste0("sd_x",input_type,"_4T.csv"))[,1]
-
-print(paste0("bands_mean: ", bands_mean))
-print(paste0("bands_sd: ", bands_sd))
+# generated in 1.DirectArray_TrainTestData_4cluster_4T
+bands_mean <- read.csv(paste0("Mean_x",input_type,"_4T_revnov.csv"))[,1]
+bands_sd <- read.csv(paste0("sd_x",input_type,"_4T_revnov.csv"))[,1]
 
 # Normalize data (only features data)
 for(i in 1:dim(pred_x_data)[1]){
@@ -103,24 +95,16 @@ for(i in 1:dim(pred_x_data)[1]){
   }
 }
 
-print("pred_x_data")
-print(pred_x_data[1:10,1,1:10,1:10,1])
 
-# plot(as.raster((pred_x_data[2700,1:128,1:128,1:3]+2)/4))
-
-# Other option: saving files as numpy zip files
-# This option was prefered as a single file can contain both training and test data
+# Save the complete image divided in tiles of 128-pixel squares of grid A
 np <- import("numpy")
 
-print(paste0("dims pred_x_data: ", dim(pred_x_data)))
-
-np$savez(paste0("Lacandona_Defor_fullImg_a_",input_type,"_4T.npz"), 
+np$savez(paste0("Lacandona_Defor_fullImg_a_",input_type,"_4T_revnov.npz"), 
          x_test = pred_x_data)
 
 # -----------------------------Second graticule-----------------------------------------
-# No need to reload and crop optic and radar. Skip that parte (commented section)
-
-# one less than the original split because this starts with an offset of 64, son 1 tile less
+# Make second grid with a vertical and horizontal offset of hald the size of the tiles
+# i.e., (128 / 2) + 1 = 65.
 splits <- c(floor((dim1-65) / img_height_exp),floor((dim2-65) / img_width_exp))
 
 x_splits <- seq(65, (floor((dim1-65) / img_height_exp) * img_height_exp), img_height_exp)
@@ -161,9 +145,6 @@ for(i in 1:dim(pred_x_data)[1]){
   }
 }
 
-# Other option: saving files as numpy zip files
-# This option was prefered as a single file can contain both training and test data
-# np <- import("numpy")
-
-np$savez(paste0("Lacandona_Defor_fullImg_b_",input_type,"_4T.npz"), 
+# Save the complete image divided in tiles of 128-pixel squares of grid B
+np$savez(paste0("Lacandona_Defor_fullImg_b_",input_type,"_4T_revnov.npz"), 
          x_test = pred_x_data)

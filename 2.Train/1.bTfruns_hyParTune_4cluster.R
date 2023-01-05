@@ -1,21 +1,18 @@
 library(keras)
 library(tfruns)
 
-# memory.limit(size=56000)
-# memory.limit()
-
-# 64 batch size no aguanta la memoria con el modelo más complejo
-imagery <- "MS"
+imagery <- "MSSAR"
 date <- Sys.Date()
 
-# find the best evaluation accuracy
+# Find the best evaluation accuracy
+# Set the hyperparameters that are going to be tested to search for the optimum configuration
 runs <- tuning_run(paste0("Unet_singleTrain_4cluster.R"),
-                   runs_dir = paste0("DeforhypTune_16batches_",imagery,"_4T",date),
+                   runs_dir = paste0("DeforhypTune_16batches_",imagery,"_4T_revnov",date),
                    sample = 1,
                    flags = list(batch_size = c(16),
                                 learn_rate = c(1e-4),
                                 epochs = c(9),
-                                dropout = c(0.1, 0.3, 0.5), 
+                                dropout = c(0.1), 
                                 filters_firstlayer = c(64),
                                 num_layers = c(4,5)),
                    echo = F,
@@ -23,8 +20,7 @@ runs <- tuning_run(paste0("Unet_singleTrain_4cluster.R"),
 
 
 
-#runs
-
+# Save all the runs info in a csv
 write.csv(runs, 
-          paste0("Runs_DeforhypTune_16batch_5layer_",imagery,"_4T_",date,".csv"),
+          paste0("Runs_DeforhypTune_16batch_4-5layer_",imagery,"_4T_",date,".csv"),
           row.names = F)
