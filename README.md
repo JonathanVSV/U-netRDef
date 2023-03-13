@@ -12,4 +12,8 @@ The structure of the repository is the following:
 
 The 3.Verif folder contains three scripts. The first one (Predict_Fullimage), makes the class predictions and get the probabilities of corresponding to each class for the complete study area (based on the files exported by 3. CompleteImage4Prediction). This script makes the predictions using two different grids, where the center of one grid overlaps with the edges of the other. Then these predictions and probabilities are used to set the class as the one with the highest probability in either of the two grids used to make the predictions (Final_Unet_ensemble). Finally, the 3.Verification_ConfMat script is used to evaluate the observed values vs the predictions made by the U-net 3D on the verif and test sets, without any augmentation.
 
+The 4. Data folder contains the deforestation polygons, the grids used to divide the image into tiles to make the train, verif and test sets, as well as the model used to make the final classification.
+
+The 5. Results folder contains the GeoTiff of the final classification, as well as its corresponding probabilty GeoTiff.
+
 ![U-net 3D classification](/5.Results/preview.png?raw=true "Deforestation detection using U-Net 3D")
