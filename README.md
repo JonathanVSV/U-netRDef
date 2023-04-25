@@ -2,7 +2,7 @@
 
 U-net 3D implemented in R for deforestation detection.
 
-The repository contains several scripts used to fit a U-net 3D model using keras (tensorflow backend) in R. This is an extension of the other repository: U-netR, where a U-net 2D was used to perform LULC a classification.
+The repository contains several scripts used to fit a U-net 3D model using keras (tensorflow backend) in R. The complete method and results can be consulted in: Solórzano, J. V., Mas, J. F., Gallardo-Cruz, J. A., Gao, Y., & Fernández-Montes de Oca, A. (2023). Deforestation detection using a spatio-temporal deep learning approach with synthetic aperture radar and multispectral images. ISPRS Journal of Photogrammetry and Remote Sensing 199, 87–101. https://doi.org/10.1016/j.isprsjprs.2023.03.017.
 
 The structure of the repository is the following:
 
