@@ -16,4 +16,10 @@ The 4. Data folder contains the deforestation polygons, the grids used to divide
 
 The 5. Results folder contains the GeoTiff of the final classification, as well as its corresponding probabilty GeoTiff.
 
+Visualization of the U-Net model, made with [PlotNeuralNet](https://github.com/HarisIqbal88/PlotNeuralNet)
+
+![U-net 3D deforestation detection](/4.FinalClassification/unet3d_4T.jpg?raw=true "U-net 3D diagram")
+
+Preview of the final deforestation classification obtained with U-net 3D MS+SAR.
+
 ![U-net 3D classification](/5.Results/preview.png?raw=true "Deforestation detection using U-Net 3D")
