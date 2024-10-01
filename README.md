@@ -18,7 +18,7 @@ The 5. Results folder contains the GeoTiff of the final classification, as well 
 
 Visualization of the U-Net model, made with [PlotNeuralNet](https://github.com/HarisIqbal88/PlotNeuralNet)
 
-![U-net 3D deforestation detection](/4.FinalClassification/unet3d_4T.jpg?raw=true "U-net 3D diagram")
+![U-net 3D deforestation detection](/5.Results/unet3d_4T.jpg?raw=true "U-net 3D diagram")
 
 Preview of the final deforestation classification obtained with U-net 3D MS+SAR.
 
