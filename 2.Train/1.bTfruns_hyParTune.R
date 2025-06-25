@@ -6,7 +6,7 @@ date <- Sys.Date()
 
 # Find the best evaluation accuracy
 # Set the hyperparameters that are going to be tested to search for the optimum configuration
-runs <- tuning_run(paste0("Unet_singleTrain_4cluster.R"),
+runs <- tuning_run(paste0("2.Train/1.aUnet_singleTrain.R"),
                    runs_dir = paste0("DeforhypTune_16batches_",imagery,"_4T_revnov",date),
                    sample = 1,
                    flags = list(batch_size = c(16),

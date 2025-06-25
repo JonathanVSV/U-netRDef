@@ -4,10 +4,10 @@ library(reticulate)
 library(tfruns)
 
 # Load Unet3d configuration
-source("Unet3d_bis.R")
+source("2.Train/Unet3d_bis.R")
 # Load multilabel dice coefficient
 # Used as synonym for avgF1-score
-source("multilabel_dice_coefficient.R")
+source("2.Train/multilabel_dice_coefficient.R")
 
 np <- import("numpy")
 
