@@ -20,7 +20,7 @@ The 4. Data folder contains the deforestation polygons, the grids used to divide
 
 The 5. Results folder contains the GeoTiff of the final classification, as well as its corresponding probability GeoTiff.
 
-## Model in hugging face
+## Model in Hugging Face
 
 The model that achieved the best performance (according to its F1-score) used only multispectral composites. This model can be consulted in Hugging Face: [jonathanvsv/Unet3D_defor](https://huggingface.co/jonathanvsv/Unet3D_defor)
 
