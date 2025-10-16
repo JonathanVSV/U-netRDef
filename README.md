@@ -24,7 +24,7 @@ The 5. Results folder contains the GeoTiff of the final classification, as well 
 
 The model that achieved the best performance (according to its F1-score) used only multispectral composites. This model can be consulted in Hugging Face: [jonathanvsv/Unet3D_defor](https://huggingface.co/jonathanvsv/Unet3D_defor)
 
-## U-net 3d architecture diagram
+## U-net 3D architecture diagram
 
 Visualization of the U-Net model, made with [PlotNeuralNet](https://github.com/HarisIqbal88/PlotNeuralNet)
 
